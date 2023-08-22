@@ -26,35 +26,95 @@
 * DEALINGS IN THE SOFTWARE.
 ============================================================================*/
 #include "circle.h"  /* Circle class interface */
+#include "corefw/string.h"
 #include <stdio.h> /* for printf() */
+#include <stdlib.h>
 
-/* NOTE: the "me" pointer has the type of the superclass to fit the vtable */
-static uint32_t Circle_area_(Shape const * const me);
-static void Circle_draw_(Shape const * const me);
+/* NOTE: the "this" pointer has the type of the superclass to fit the vtable */
+static uint32_t Circle_area(Shape const * const ptr);
+static void Circle_draw(Shape const * const ptr);
 
-/* constructor */
-void Circle_ctor(Circle * const me, int16_t x, int16_t y,
-                 uint16_t rad)
-{
-    static struct ShapeVtbl const vtbl = { /* vtbl of the Circle class */
-        &Circle_area_,
-        &Circle_draw_
-    };
-    Shape_ctor(&me->super, x, y); /* call the superclass' ctor */
-    me->super.vptr = &vtbl; /* override the vptr */
-    me->rad = rad;
-}
 
 /* Circle's class implementations of its virtual functions... */
-static uint32_t Circle_area_(Shape const * const me) {
-    Circle const * const me_ = (Circle const *)me; /* explicit downcast */
+static uint32_t Circle_area(Shape const * const ptr) {
+    Circle const * const this = (Circle const *)ptr; /* explicit downcast */
     /* pi is approximated as 3 */
-    return 3U * (uint32_t)me_->rad * (uint32_t)me_->rad;
+    return 3U * (uint32_t)this->rad * (uint32_t)this->rad;
 }
 
-static void Circle_draw_(Shape const * const me) {
-    Circle const * const me_ = (Circle const *)me; /* explicit downcast */
+static void Circle_draw(Shape const * const ptr) {
+    Circle const * const this = (Circle const *)ptr; /* explicit downcast */
     printf("Circle_draw_(x=%d,y=%d,rad=%d)\n",
-           Shape_getX(me), Shape_getY(me), me_->rad);
+           Shape_getX(ptr), Shape_getY(ptr), this->rad);
 }
+
+/* constructor */
+static bool ctor(void *ptr, va_list args)
+{
+    static struct ShapeVtbl const vtbl = {  /* vtbl of the Circle class */
+        &Circle_area,
+        &Circle_draw
+    };
+
+    Circle *this = ptr;
+
+    cfw_shape->ctor(&this->super, args);    /* call the superclass' ctor */
+    this->rad = va_arg(args, intmax_t);     /* and set the radius */
+    this->super.vptr = &vtbl;               /* override the vptr */
+
+	return true;
+}
+
+static bool equal(void *ptr1, void *ptr2)
+{
+	CFWObject *obj2 = ptr2;
+	Circle *circle1, *circle2;
+
+	if (obj2->cls != cfw_shape)
+		return false;
+
+	circle1 = ptr1;
+	circle2 = ptr2;
+
+	return (circle1->super.x == circle2->super.x)
+        && (circle1->super.y == circle2->super.y)
+        && (circle1->rad == circle2->rad);
+}
+
+static uint32_t hash(void *ptr)
+{
+	Circle *circle = ptr;
+
+	return *(uint32_t*)circle;
+}
+
+static void* copy(void *ptr)
+{
+	return cfw_ref(ptr);
+}
+
+static CFWString* toString(void *ptr) 
+{
+    Circle *this = ptr; 
+    const char* mask = "\t%s\n\tCircle x:%d y:%d rad:%d\n";
+
+    CFWString *s = cfw_shape->toString(ptr);
+	int len = snprintf(NULL, 0, "\t%s\n\tCircle x:%d y:%d rad:%d\n", cfw_string_c(s), this->super.x, this->super.y, this->rad);
+    char* buffer = calloc(1, len+2);
+	snprintf(buffer, len+1, "\t%s\n\tCircle x:%d y:%d rad:%d\n", cfw_string_c(s), this->super.x, this->super.y, this->rad);
+    return cfw_create(cfw_string, buffer);
+}
+
+
+static CFWClass class = {
+	.name = "Circle",
+	.size = sizeof(Circle),
+	.ctor = ctor,
+	.equal = equal,
+	.hash = hash,
+	.copy = copy,
+    .toString = toString
+};
+CFWClass *cfw_circle = &class;
+
 

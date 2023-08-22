@@ -30,29 +30,29 @@
 #include <stdio.h>  /* for printf() */
 
 int main() {
-    Rectangle r1, r2; /* multiple instances of Rectangle */
-    Circle    c1, c2; /* multiple instances of Circle */
-    Shape const *shapes[] = { /* collection of shapes */
-        &c1.super,
-        &r2.super,
-        &c2.super,
-        &r1.super
-    };
-    Shape const *s;
 
-    /* instantiate rectangles... */
-    Rectangle_ctor(&r1, 0, 2, 10, 15);
-    Rectangle_ctor(&r2, -1, 3, 5, 8);
+	CFWRefPool *pool = cfw_new(cfw_refpool);
 
-    /* instantiate circles... */
-    Circle_ctor(&c1, 1, -2, 12);
-    Circle_ctor(&c2, 1, -3, 6);
+	CFWArray *shapes = cfw_create(cfw_array,
+        cfw_create(cfw_rectangle, 0, 2, 10, 15),
+        cfw_create(cfw_rectangle, -1, 3, 5, 8),
+        cfw_create(cfw_circle, 1, -2, 12),
+        cfw_create(cfw_circle, 1, -3, 6),
+        NULL);
 
-    s = largestShape(shapes, sizeof(shapes)/sizeof(shapes[0]));
-    printf("largetsShape s(x=%d,y=%d)\n",
+    Shape const *s = largestShape(shapes);
+
+    printf("largestShape s(x=%d,y=%d)\n",
            Shape_getX(s), Shape_getY(s));
 
-    drawAllShapes(shapes, sizeof(shapes)/sizeof(shapes[0]));
+    drawAllShapes(shapes);
 
+    for (int i = 0; i < cfw_array_size(shapes); i++) {
+        
+        CFWString *s = cfw_toString(cfw_array_get(shapes, i));
+        printf("%s\n", cfw_string_c(s));
+    }
+
+	cfw_unref(pool);
     return 0;
 }

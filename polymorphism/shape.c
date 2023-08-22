@@ -27,65 +27,112 @@
 ============================================================================*/
 #include "shape.h"
 #include <assert.h>
-
-/* Shape's prototypes of its virtual functions */
-static uint32_t Shape_area_(Shape const * const me);
-static void Shape_draw_(Shape const * const me);
-
-/* constructor */
-void Shape_ctor(Shape * const me, int16_t x, int16_t y) {
-    static struct ShapeVtbl const vtbl = { /* vtbl of the Shape class */
-        &Shape_area_,
-        &Shape_draw_
-     };
-     me->vptr = &vtbl; /* "hook" the vptr to the vtbl */
-     me->x = x;
-     me->y = y;
-}
+#include <stdlib.h>
+#include <stdio.h>
 
 /* move-by operation */
-void Shape_moveBy(Shape * const me, int16_t dx, int16_t dy) {
-    me->x += dx;
-    me->y += dy;
+void Shape_moveBy(Shape * const this, int16_t dx, int16_t dy) {
+    this->x += dx;
+    this->y += dy;
 }
+
 
 /* "getter" operations implementation */
-int16_t Shape_getX(Shape const * const me) {
-    return me->x;
+int16_t Shape_getX(Shape const * const this) {
+    return this->x;
 }
-int16_t Shape_getY(Shape const * const me) {
-    return me->y;
-}
-
-/* Shape class implementations of its virtual functions... */
-static uint32_t Shape_area_(Shape const * const me) {
-    assert(0); /* purely-virtual function should never be called */
-    return 0U; /* to avoid compiler warnings */
+int16_t Shape_getY(Shape const * const this) {
+    return this->y;
 }
 
-static void Shape_draw_(Shape const * const me) {
-    assert(0); /* purely-virtual function should never be called */
-}
 
 /* the following code finds the largest-area shape in the collection */
-Shape const *largestShape(Shape const *shapes[], uint32_t nShapes) {
-    Shape const *s = (Shape *)0;
-    uint32_t max = 0U;
-    uint32_t i;
-    for (i = 0U; i < nShapes; ++i) {
-        uint32_t area = Shape_area(shapes[i]); /* virtual call */
+Shape const *largestShape(CFWArray *shapes) {
+    Shape const *s = NULL;//(Shape *)0;
+
+    for (int i = 0, max=0; i < cfw_array_size(shapes); ++i) {
+        int area = Shape_area(cfw_array_get(shapes, i)); /* virtual call */
         if (area > max) {
             max = area;
-            s = shapes[i];
+            s = cfw_array_get(shapes, i);
         }
     }
     return s; /* the largest shape in the array shapes[] */
 }
 
 /* The following code will draw all Shapes on the screen */
-void drawAllShapes(Shape const *shapes[], uint32_t nShapes) {
-    uint32_t i;
-    for (i = 0U; i < nShapes; ++i) {
-        Shape_draw(shapes[i]); /* virtual call */
+void drawAllShapes(CFWArray *shapes) {
+    for (int i = 0; i < cfw_array_size(shapes); ++i) {
+        Shape_draw(cfw_array_get(shapes, i)); /* virtual call */
     }
 }
+
+/**
+ * Shape *s = cfw_create(cfw_shape, 10, 10);
+ */
+static bool ctor(void *ptr, va_list args)
+{
+	Shape *this = ptr;
+
+    static struct ShapeVtbl const vtbl = { 0 };
+    this->vptr = &vtbl;        /* "hook" the vptr to the vtbl */
+	this->x = va_arg(args, intmax_t);
+	this->y = va_arg(args, intmax_t);
+
+	return true;
+}
+
+static bool equal(void *ptr1, void *ptr2)
+{
+	CFWObject *obj2 = ptr2;
+	Shape *shape1, *shape2;
+
+	if (obj2->cls != cfw_shape)
+		return false;
+
+	shape1 = ptr1;
+	shape2 = ptr2;
+
+	return (shape1->x == shape2->x)
+        && (shape1->y == shape2->y);
+}
+
+static uint32_t hash(void *ptr)
+{
+	Shape *this = ptr;
+
+	return *(uint32_t*)this;
+}
+
+static void* copy(void *ptr)
+{
+	return cfw_ref(ptr);
+}
+
+static CFWString* toString(void *ptr) 
+{
+    char* mask = "Shape x:%d y:%d";
+
+    Shape *this = ptr;
+    int len = snprintf(NULL, 0, mask, this->x, this->y);
+    char* s = calloc(1, len+2);
+    if (s == NULL) return NULL;
+	snprintf(s, len+1, mask, this->x, this->y);
+    CFWString *str = cfw_create(cfw_string, s);
+    free(s);
+    return str;
+
+}
+
+static CFWClass class = {
+	.name = "Shape",
+	.size = sizeof(Shape),
+	.ctor = ctor,
+	.equal = equal,
+	.hash = hash,
+	.copy = copy,
+    .toString = toString
+};
+CFWClass *cfw_shape = &class;
+
+
